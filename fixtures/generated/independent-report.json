@@ -1,0 +1,262 @@
+[
+  {
+    "file": "assembly-none.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 82160.02769891672,
+    "bounds": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        210.0,
+        40.0,
+        138.3333282470703
+      ]
+    ],
+    "bodies": 4,
+    "faces": 92
+  },
+  {
+    "file": "assembly-outline.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 113551.9274294842,
+    "bounds": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        210.0,
+        40.0,
+        142.3326873779297
+      ]
+    ],
+    "bodies": 4,
+    "faces": 752
+  },
+  {
+    "file": "assembly-plate.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 138192.0253606389,
+    "bounds": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        210.0,
+        40.0,
+        142.3333282470703
+      ]
+    ],
+    "bodies": 1,
+    "faces": 116
+  },
+  {
+    "file": "assembly-silhouette.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 108933.37949819451,
+    "bounds": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        210.0,
+        40.0,
+        138.3333282470703
+      ]
+    ],
+    "bodies": 4,
+    "faces": 136
+  },
+  {
+    "file": "donut.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 2400.0,
+    "bounds": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        30.0,
+        30.0,
+        3.0
+      ]
+    ],
+    "bodies": 1,
+    "faces": 32
+  },
+  {
+    "file": "frame.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 3600.0,
+    "bounds": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        40.0,
+        40.0,
+        3.0
+      ]
+    ],
+    "bodies": 1,
+    "faces": 32
+  },
+  {
+    "file": "nfc-base.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 5686.345151691585,
+    "bounds": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        40.0,
+        30.0,
+        5.0
+      ]
+    ],
+    "bodies": 1,
+    "faces": 268
+  },
+  {
+    "file": "synthetic-mono.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 40160.02754764422,
+    "bounds": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        200.0,
+        133.3333282470703,
+        3.0
+      ]
+    ],
+    "bodies": 4,
+    "faces": 76
+  },
+  {
+    "file": "synthetic-region-1.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 30187.771719540582,
+    "bounds": [
+      [
+        0.0,
+        6.896551609039307,
+        0.0
+      ],
+      [
+        114.9425277709961,
+        121.83908081054688,
+        3.0
+      ]
+    ],
+    "bodies": 1,
+    "faces": 36
+  },
+  {
+    "file": "synthetic-region-2.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 3107.411470840336,
+    "bounds": [
+      [
+        98.85057830810547,
+        91.95402526855469,
+        0.0
+      ],
+      [
+        154.0229949951172,
+        133.3333282470703,
+        3.0
+      ]
+    ],
+    "bodies": 1,
+    "faces": 8
+  },
+  {
+    "file": "synthetic-region-3.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 2742.7663838631415,
+    "bounds": [
+      [
+        126.43678283691406,
+        57.47126388549805,
+        0.0
+      ],
+      [
+        172.41378784179688,
+        103.44827270507812,
+        3.0
+      ]
+    ],
+    "bodies": 1,
+    "faces": 8
+  },
+  {
+    "file": "synthetic-region-4.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 3551.3282972434536,
+    "bounds": [
+      [
+        181.60919189453125,
+        0.0,
+        0.0
+      ],
+      [
+        200.0,
+        64.36781311035156,
+        3.0
+      ]
+    ],
+    "bodies": 1,
+    "faces": 12
+  },
+  {
+    "file": "synthetic-region-5.stl",
+    "watertight": true,
+    "winding_consistent": true,
+    "volume": 570.7493259280454,
+    "bounds": [
+      [
+        183.90805053710938,
+        85.0574722290039,
+        0.0
+      ],
+      [
+        197.70115661621094,
+        98.85057830810547,
+        3.0
+      ]
+    ],
+    "bodies": 1,
+    "faces": 12
+  }
+]
