@@ -1,7 +1,7 @@
 import type { State } from "./types";
 export const branding = {
   name: "Inventico",
-  suffix: "calc",
+  suffix: "",
   tagline: "Sua criatividade. Um negócio rentável.",
 };
 export const id = () => crypto.randomUUID();

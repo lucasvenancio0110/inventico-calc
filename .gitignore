@@ -6,3 +6,4 @@ preview*.png
 .env
 .env.*
 *.log
+.inventico-ai-budget.json

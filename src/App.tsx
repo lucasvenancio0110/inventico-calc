@@ -1,5 +1,5 @@
 import { useModalFocus } from "./components/useModalFocus";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import {
   Box,
   Calculator,
@@ -23,8 +23,14 @@ import { Results } from "./components/Results";
 import { Settings } from "./pages/Settings";
 import { Products } from "./pages/Products";
 import { Analysis } from "./pages/Analysis";
+const Studio = lazy(() => import("./studio/Studio"));
 const initial = storage.load();
 export default function App() {
+  const [studioOpened, setStudioOpened] = useState(false);
+  const [previousSimulation, setPreviousSimulation] = useState<{
+    simulation: State["simulation"];
+    editedId: string | null;
+  } | null>(null);
   const [state, setState] = useState<State>(initial.state),
     [page, setPage] = useState("calculator"),
     [advanced, setAdvanced] = useState(false),
@@ -105,6 +111,8 @@ export default function App() {
   };
   const nav = [
     { id: "calculator", name: "Calculadora", icon: Calculator },
+    { id: "create", name: "Criar peça 3D", icon: Box },
+    { id: "projects", name: "Meus projetos", icon: Save },
     { id: "products", name: "Produtos", icon: Package },
     { id: "analysis", name: "Análise", icon: ChartNoAxesCombined },
     { id: "settings", name: "Configurações", icon: Settings2 },
@@ -134,7 +142,11 @@ export default function App() {
             <button
               key={n.id}
               className={page === n.id ? "active" : ""}
-              onClick={() => setPage(n.id)}
+              onClick={() => {
+                if (n.id === "create" || n.id === "projects")
+                  setStudioOpened(true);
+                setPage(n.id);
+              }}
             >
               <n.icon size={19} />
               <span>{n.name}</span>
@@ -147,14 +159,14 @@ export default function App() {
         <div className="sidebar-bottom">
           <div className="local-badge">
             <span className="live-dot" />
-            100% local
+            Local · IA opcional
           </div>
           <p>
             Suas ideias têm valor.
             <br />
             Descubra quanto.
           </p>
-          <span className="version">INVENTICO CALC · V1.0</span>
+          <span className="version">INVENTICO · V2.0</span>
         </div>
       </aside>
       <main>
@@ -199,6 +211,61 @@ export default function App() {
               {errors.map((error, i) => (
                 <div key={i}>{error}</div>
               ))}
+            </div>
+          )}
+          {studioOpened && (
+            <div hidden={page !== "create" && page !== "projects"}>
+              <Suspense
+                fallback={<p role="status">Carregando o estúdio 3D…</p>}
+              >
+                <Studio
+                  view={page === "projects" ? "projects" : "create"}
+                  onView={setPage}
+                  filaments={state.filaments}
+                  onFinance={(data) => {
+                    setPreviousSimulation({
+                      simulation: structuredClone(state.simulation),
+                      editedId,
+                    });
+                    setEditedId(null);
+                    update({
+                      ...state,
+                      simulation: {
+                        ...defaults().simulation,
+                        ...data,
+                        printerId: state.printers[0].id,
+                        channelId: state.channels[0].id,
+                        quantity: 1,
+                        price: null,
+                        waste: [],
+                      },
+                    });
+                    setPage("calculator");
+                    setToast(
+                      "Nova simulação criada com dados confirmados. Materiais adicionais estão discriminados nos componentes.",
+                    );
+                  }}
+                />
+              </Suspense>
+            </div>
+          )}
+          {page === "calculator" && previousSimulation && (
+            <div className="note">
+              Simulação anterior preservada durante esta sessão.{" "}
+              <button
+                className="secondary"
+                onClick={() => {
+                  update({
+                    ...state,
+                    simulation: previousSimulation.simulation,
+                  });
+                  setEditedId(previousSimulation.editedId);
+                  setPreviousSimulation(null);
+                  setToast("Simulação anterior restaurada.");
+                }}
+              >
+                Restaurar simulação anterior
+              </button>
             </div>
           )}
           {page === "calculator" && (
@@ -445,7 +512,7 @@ export default function App() {
             <span className="brand-mark">
               <Box size={30} />
             </span>
-            <span className="eyebrow">BEM-VINDO AO INVENTICO CALC</span>
+            <span className="eyebrow">BEM-VINDO AO INVENTICO</span>
             <h1 id="welcome-title">
               Sua próxima impressão.
               <br />

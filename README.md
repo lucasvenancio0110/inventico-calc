@@ -1,6 +1,6 @@
-# Inventico Calc
+# Inventico
 
-Aplicação local de custo, precificação e rentabilidade para impressão 3D. React + TypeScript + Vite, Tailwind CSS, Lucide, Recharts e Vitest. Não exige login, backend, conta, GitHub ou serviços externos durante o uso.
+Aplicação para criar letreiros a partir de logos, visualizar e exportar STL, salvar projetos e calcular custo, precificação e rentabilidade para impressão 3D. React + TypeScript + Vite, Tailwind CSS, Lucide, Recharts e Vitest. O fluxo local não exige login ou backend. A geração de imagens e o planejamento com IA usam um serviço opcional, com configuração separada.
 
 ## Iniciar no Windows
 
@@ -15,7 +15,7 @@ Abra http://localhost:5173. A porta é fixa: se estiver ocupada, o Vite avisa em
 
 Você também pode dar duplo clique em `Iniciar.cmd`. Ele usa a instalação local de Node.js preparada neste PC se o npm ainda não estiver no PATH do terminal.
 
-A instalação inicial das dependências usa o registro npm. Depois de instaladas, a aplicação funciona localmente, sem conexões a serviços externos. Não abra o index.html diretamente: use o servidor Vite.
+A instalação inicial das dependências usa o registro npm. Depois de instaladas, a calculadora e a modelagem local funcionam sem serviços externos; a IA opcional exige conexão. Não abra o index.html diretamente: use o servidor Vite.
 
 ## Comandos
 
@@ -134,3 +134,14 @@ O workflow `.github/workflows/pages.yml` valida lint, TypeScript, testes e build
 No celular, os dados continuam no localStorage do navegador. Dados do PC, localhost e site publicado não são sincronizados. Para transferir, exporte o backup JSON no PC e importe no celular. Backups, arquivos de ambiente e prévias locais não entram no repositório.
 
 Em Settings → Pages, a origem de publicação deve ser GitHub Actions. O serviço publica somente os arquivos de `dist/`; dados do localStorage não são enviados.
+
+
+## Logo → imagens → 3D → STL
+
+Abra **Criar peça 3D** e envie uma logo SVG, PNG ou JPEG. Para o fluxo visual, escolha **Gerar imagem, aprovar e modelar**. Configure o [serviço de IA](server/README.md), autorize o envio e gere a proposta. Aprove o visual, revise um plano sugerido ou confirme medidas manualmente, confira contornos e gere o modelo real.
+
+Os contornos da logo definem a peça. A imagem aprovada orienta a montagem; não há reconstrução universal de geometria a partir de fotos. Letras em SVG precisam estar convertidas em curvas e traços em formas preenchidas. As cores e espessuras são editáveis; o rebaixo NFC opcional usa as medidas informadas da etiqueta.
+
+Projetos ficam em IndexedDB separado dos dados financeiros. Exporte backup 3D com fontes e proposta visual. A calculadora continua usando `inventico-calc:v1`. Massa e tempo vêm do fatiador, não de estimativas do volume geométrico.
+
+**Verificação:** `npm test` inclui provas de furos, cores, componentes alinhados, rebaixo NFC, exportação e respostas simuladas do serviço. Para inspeção independente, instale `trimesh`, `numpy`, `scipy` e `networkx` e execute `python scripts/verify-stl.py` após os testes. O script apenas inspeciona; não repara nem reexporta as malhas.
