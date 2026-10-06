@@ -7,3 +7,5 @@ preview*.png
 .env.*
 *.log
 .inventico-ai-budget.json
+.wrangler/
+.dev.vars

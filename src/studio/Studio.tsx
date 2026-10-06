@@ -124,6 +124,7 @@ export default function Studio({
   onFinance: (data: FinanceTransfer) => void;
 }) {
   const [project, setProject] = useState<Project>(newProject),
+    [simple, setSimple] = useState(true),
     [generated, setGenerated] = useState<Generated | null>(null),
     [busy, setBusy] = useState(""),
     [status, setStatus] = useState(""),
@@ -133,7 +134,9 @@ export default function Studio({
     [original, setOriginal] = useState<Region[] | null>(null),
     [contoursCurrent, setContoursCurrent] = useState(true),
     [pendingImport, setPendingImport] = useState<Project | null>(null),
-    [endpoint, setEndpoint] = useState("http://127.0.0.1:8787"),
+    [endpoint, setEndpoint] = useState(
+      import.meta.env.VITE_AI_ENDPOINT || "http://127.0.0.1:8787",
+    ),
     [serviceReady, setServiceReady] = useState(false),
     [accessToken, setAccessToken] = useState(""),
     [aiDescription, setAiDescription] = useState(""),
@@ -154,6 +157,17 @@ export default function Studio({
     aiAbort = useRef<AbortController | null>(null);
   current.current = project;
   const fresh = generated?.revision === project.revisionId;
+  const approvedModel = project.modelApprovalRevision;
+  function approveModel() {
+    if (!fresh || busy) return;
+    const approved = {
+      ...current.current,
+      modelApprovalRevision: current.current.revisionId,
+    };
+    current.current = approved;
+    setProject(approved);
+    setStatus("3D confirmado. Baixe seu STL ou salve o projeto.");
+  }
   const source = project.sourceAssets.find(
     (a) => a.hash === project.sourceHash,
   );
@@ -316,7 +330,7 @@ export default function Studio({
       if (sequence === uploads.current) setBusy("");
     }
   }
-  async function extract() {
+  async function extract(onDone?: () => void) {
     const p = current.current,
       a = p.sourceAssets.find((a) => a.hash === p.sourceHash);
     if (!a) return;
@@ -327,6 +341,7 @@ export default function Studio({
         edit({ regions: r, contoursCurrent: true }, true);
         setOriginal(r);
         setContoursCurrent(true);
+        onDone?.();
         return;
       }
       setBusy("Preparando o recorte…");
@@ -365,18 +380,82 @@ export default function Studio({
       bitmap.close();
       const data = context.getImageData(0, 0, w, h).data;
       canvas.width = canvas.height = 1;
+      let traceProcessing = p.processing;
+      let automaticBackground: number[] | null = null;
+      if (onDone && simple) {
+        const counts = new Map<string, number>();
+        let samples = 0;
+        for (let i = 0; i < data.length; i += 256) {
+          if (data[i + 3] < p.processing.alpha) continue;
+          const key = [data[i], data[i + 1], data[i + 2]]
+            .map((v) => Math.round(v / 32))
+            .join(",");
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+          samples++;
+        }
+        const colors = Math.max(
+          1,
+          Math.min(
+            12,
+            [...counts.values()].filter((n) => n > samples * 0.01).length,
+          ),
+        );
+        traceProcessing = { ...p.processing, colors };
+      }
+      if (onDone && simple && !p.processing.removeBackground) {
+        const corners = [0, w - 1, (h - 1) * w, h * w - 1].map((i) =>
+          Array.from(data.slice(i * 4, i * 4 + 4)),
+        );
+        if (
+          corners.every(
+            (c) =>
+              c[3] >= p.processing.alpha &&
+              c.slice(0, 3).every((v, i) => Math.abs(v - corners[0][i]) <= 8),
+          )
+        ) {
+          const background =
+            "#" +
+            corners[0]
+              .slice(0, 3)
+              .map((v) => v.toString(16).padStart(2, "0"))
+              .join("");
+          traceProcessing = {
+            ...traceProcessing,
+            background,
+          };
+          automaticBackground = corners[0].slice(0, 3);
+        }
+      }
       runWorker(
         "trace",
-        { data, width: w, height: h, processing: p.processing },
+        { data, width: w, height: h, processing: traceProcessing },
         p.revisionId,
         (value) => {
-          const r = value as Region[];
+          const r = (value as Region[]).map((region) => {
+            const rgb = [1, 3, 5].map((i) =>
+              parseInt(region.color.slice(i, i + 2), 16),
+            );
+            return automaticBackground &&
+              rgb.every(
+                (v, i) =>
+                  Math.abs(v - automaticBackground![i]) <=
+                  p.processing.tolerance,
+              )
+              ? { ...region, enabled: false }
+              : region;
+          });
           edit(
             {
               regions: r,
+              processing: traceProcessing,
               contoursCurrent: true,
               assumptions: [
                 ...p.assumptions.filter((s) => !s.startsWith("Tracing:")),
+                ...(automaticBackground
+                  ? [
+                      "Região de fundo uniforme desativada automaticamente, preservando os vazios internos. Confira a prévia; reative a região em Ajustar detalhes se necessário.",
+                    ]
+                  : []),
                 `Tracing: borda de pixels, somente vértices colineares removidos; desvio de até um pixel (${num(p.options.width / w, 3)} mm na largura atual). Fonte ${a.role === "photo" ? "fotográfica, com escala e profundidade informadas/sugeridas" : "raster"}.`,
               ],
             },
@@ -387,6 +466,7 @@ export default function Studio({
           setStatus(
             "Contornos extraídos. Confira furos, letras, pingos e cores antes de gerar.",
           );
+          onDone?.();
         },
       );
     } catch (e) {
@@ -396,7 +476,7 @@ export default function Studio({
   }
   function generate() {
     const p = current.current;
-    if (!p.reviewed || !contoursCurrent) return;
+    if (!p.reviewed || !p.contoursCurrent) return;
     if (
       p.workflow === "concept" &&
       (!p.concept?.approved || !p.concept.planned)
@@ -509,7 +589,7 @@ export default function Studio({
       setError(safeError(e));
     }
   }
-  async function analyze() {
+  async function analyze(automatic = false) {
     if (!consent || !serviceReady) return;
     const p = current.current;
     cancel();
@@ -565,6 +645,15 @@ export default function Studio({
         ) {
           setPlan(proposal);
           setStatus("Proposta recebida. Revise antes de aplicar.");
+          if (automatic) {
+            if (proposal.status !== "proposal") {
+              setError(proposal.questions.join(" ") || proposal.summary);
+            } else {
+              aiAbort.current = null;
+              setBusy("");
+              applyPlan(proposal, true);
+            }
+          }
         }
       } finally {
         clearTimeout(timeout);
@@ -578,35 +667,79 @@ export default function Studio({
       }
     }
   }
-  function applyPlan() {
-    if (!plan || plan.status !== "proposal") return;
+  function applyPlan(proposal = plan, automatic = false) {
+    if (!proposal || proposal.status !== "proposal") return;
+    const active = current.current;
     edit(
       {
         options: {
-          ...project.options,
-          mounting: plan.mounting,
-          backing: plan.backing,
-          width: plan.targetWidthMm ?? project.options.width,
-          backingColor: plan.supportColor ?? project.options.backingColor,
-          baseColor: plan.baseColor ?? project.options.baseColor,
+          ...active.options,
+          mounting: proposal.mounting,
+          backing: proposal.backing,
+          width: automatic
+            ? active.options.width
+            : (proposal.targetWidthMm ?? active.options.width),
+          backingColor: proposal.supportColor ?? active.options.backingColor,
+          baseColor: proposal.baseColor ?? active.options.baseColor,
         },
-        concept: project.concept?.approved
-          ? { ...project.concept, planned: true }
-          : project.concept,
-        regions: project.regions.map((r) => ({
+        concept: active.concept?.approved
+          ? { ...active.concept, planned: true }
+          : active.concept,
+        regions: active.regions.map((r) => ({
           ...r,
           height:
-            plan.layers.find((l) => l.regionId === r.id)?.heightMm ?? r.height,
+            proposal.layers.find((l) => l.regionId === r.id)?.heightMm ??
+            r.height,
           color:
-            plan.palette.find((c) => c.regionId === r.id)?.color ?? r.color,
+            proposal.palette.find((c) => c.regionId === r.id)?.color ?? r.color,
         })),
-        assumptions: [...project.assumptions, ...plan.assumptions].slice(-30),
+        assumptions: [...active.assumptions, ...proposal.assumptions].slice(
+          -30,
+        ),
       },
       true,
     );
     setStatus(
       "Proposta aplicada como nova revisão. Confira os contornos e confirme.",
     );
+    if (automatic) {
+      edit({ reviewed: true });
+      generate();
+    }
+  }
+  async function createSimple() {
+    if (!source || busy) return;
+    const hasReference = current.current.sourceAssets.some(
+      (a) => a.role === "photo",
+    );
+    if (hasReference && (!serviceReady || !consent || !accessToken)) {
+      setError(
+        "Para usar sua referência automaticamente, conecte a IA e autorize o envio em ‘Conectar IA’. A chave OpenAI precisa estar configurada no Cloudflare.",
+      );
+      return;
+    }
+    const p = current.current;
+    edit({
+      workflow: "local",
+      reviewed: true,
+      options: {
+        ...p.options,
+        backing: p.options.backing === "none" ? "outline" : p.options.backing,
+        border: Math.max(p.options.border, 6),
+        baseWidth: p.options.width + 10,
+      },
+      assumptions: [
+        ...p.assumptions,
+        "Prévia automática: confira contornos, dimensões e montagem antes de confirmar o 3D.",
+      ].slice(-30),
+    });
+    const next = () => {
+      edit({ reviewed: true });
+      if (hasReference) void analyze(true);
+      else generate();
+    };
+    if (!current.current.contoursCurrent) await extract(next);
+    else next();
   }
   function transfer() {
     try {
@@ -800,25 +933,28 @@ export default function Studio({
                   >
                     Backup
                   </button>
-                  {r.mesh && r.validated && (
-                    <button
-                      className="secondary"
-                      onClick={() => {
-                        try {
-                          download(
-                            exportPackage(r.validated!, r.mesh!),
-                            "inventico-" +
-                              slug(r.draft.name) +
-                              "-revisao-validada.zip",
-                          );
-                        } catch (e) {
-                          setError(safeError(e));
-                        }
-                      }}
-                    >
-                      STLs da revisão validada
-                    </button>
-                  )}
+                  {r.mesh &&
+                    r.validated &&
+                    r.validated.modelApprovalRevision ===
+                      r.validated.revisionId && (
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          try {
+                            download(
+                              exportPackage(r.validated!, r.mesh!),
+                              "inventico-" +
+                                slug(r.draft.name) +
+                                "-revisao-validada.zip",
+                            );
+                          } catch (e) {
+                            setError(safeError(e));
+                          }
+                        }}
+                      >
+                        STLs da revisão validada
+                      </button>
+                    )}
                   <button
                     className="secondary"
                     onClick={async () => {
@@ -856,8 +992,11 @@ export default function Studio({
       ) : (
         <>
           <p className="note">
-            Logo → proposta visual → aprovação → medidas e modelo 3D → STL
+            Logo + referência → criar 3D → confirmar → baixar STL
           </p>
+          <button className="secondary" onClick={() => setSimple(!simple)}>
+            {simple ? "Ajustar detalhes" : "Voltar ao modo simples"}
+          </button>
           <div className="studio-layout">
             <div className="studio-inputs">
               <section className="panel">
@@ -869,7 +1008,28 @@ export default function Studio({
                   onChange={(name) => edit({ name })}
                 />
                 {(["logo", "photo"] as const).map((role) => (
-                  <div key={role}>
+                  <div
+                    key={role}
+                    tabIndex={0}
+                    role="group"
+                    aria-label={
+                      role === "logo" ? "Colar logo" : "Colar referência"
+                    }
+                    onPaste={(e) => {
+                      const file = Array.from(e.clipboardData.files).find((f) =>
+                        f.type.startsWith("image/"),
+                      );
+                      if (file) {
+                        e.preventDefault();
+                        void upload(file, role);
+                      }
+                    }}
+                  >
+                    <p className="muted small">
+                      Clique nesta área e pressione Ctrl+V para colar{" "}
+                      {role === "logo" ? "a logo" : "a referência"}, ou escolha
+                      um arquivo.
+                    </p>
                     <label
                       className="studio-upload"
                       onDragOver={(e) => e.preventDefault()}
@@ -936,7 +1096,55 @@ export default function Studio({
                   texto e traços em contornos.
                 </p>
               </section>
-              {source && (
+              {simple && source && (
+                <section className="panel">
+                  <h2>Crie sua peça</h2>
+                  <Numeric
+                    label="Largura desejada (mm)"
+                    value={project.options.width}
+                    min={5}
+                    max={1000}
+                    onChange={(width) => options({ width })}
+                  />
+                  <p className="muted small">
+                    200 mm é a sugestão inicial. Confira as medidas na prévia.
+                  </p>
+                  <label className="field">
+                    <span>Tipo de peça</span>
+                    <select
+                      value={project.options.mounting}
+                      onChange={(e) =>
+                        options({
+                          mounting: e.target.value as Options["mounting"],
+                        })
+                      }
+                    >
+                      <option value="wall">Placa de parede</option>
+                      <option value="counter">Placa de balcão com base</option>
+                    </select>
+                  </label>
+                  <button
+                    className="primary full"
+                    disabled={!!busy}
+                    onClick={() => void createSimple()}
+                  >
+                    <Box size={18} />
+                    Criar meu 3D
+                  </button>
+                  <p className="muted small">
+                    A logo define os contornos. Com referência, a IA sugere
+                    acabamento e montagem; você confirma o resultado antes de
+                    baixar.
+                  </p>
+                  {!serviceReady &&
+                    project.sourceAssets.some((a) => a.role === "photo") && (
+                      <p className="note">
+                        A análise da referência depende da conexão de IA abaixo.
+                      </p>
+                    )}
+                </section>
+              )}
+              {!simple && source && (
                 <ConceptStage
                   project={project}
                   onChange={(patch) => edit(patch)}
@@ -948,7 +1156,7 @@ export default function Studio({
                   busy={!!busy}
                 />
               )}
-              {source && (
+              {!simple && source && (
                 <section className="panel">
                   <span className="eyebrow">2 · RECORTE E REVISÃO</span>
                   <h2>Preserve os detalhes da marca</h2>
@@ -1071,7 +1279,7 @@ export default function Studio({
                   </p>
                 </section>
               )}
-              {project.regions.length > 0 && (
+              {!simple && project.regions.length > 0 && (
                 <section className="panel">
                   <span className="eyebrow">3 · TAMANHO E MONTAGEM</span>
                   <h2>Defina a peça</h2>
@@ -1306,6 +1514,27 @@ export default function Studio({
                       component={component}
                       mounting={project.options.mounting}
                     />
+                    {fresh && approvedModel !== project.revisionId && (
+                      <div className="note">
+                        <p>
+                          Confira a prévia 3D, as letras, os vazios e as
+                          medidas. Ao confirmar, os downloads serão liberados.
+                        </p>
+                        <button
+                          className="primary full"
+                          disabled={!!busy}
+                          onClick={approveModel}
+                        >
+                          <Check size={18} />
+                          Confirmar este 3D
+                        </button>
+                      </div>
+                    )}
+                    {fresh && approvedModel === project.revisionId && (
+                      <p className="note">
+                        3D confirmado. Seu STL está pronto para baixar.
+                      </p>
+                    )}
                     {!fresh && (
                       <div className="alert">
                         Prévia desatualizada. Gere novamente para baixar a
@@ -1358,7 +1587,7 @@ export default function Studio({
                   </div>
                 )}
               </section>
-              {project.regions.length > 0 && (
+              {!simple && project.regions.length > 0 && (
                 <section className="panel">
                   <div className="section-row">
                     <h2>Cores e relevos</h2>
@@ -1510,7 +1739,9 @@ export default function Studio({
                   <>
                     <button
                       className="primary full"
-                      disabled={!fresh || !!busy}
+                      disabled={
+                        !fresh || !!busy || approvedModel !== project.revisionId
+                      }
                       onClick={() => {
                         try {
                           download(
@@ -1530,7 +1761,11 @@ export default function Studio({
                         <button
                           key={p.id}
                           className="secondary"
-                          disabled={!fresh || !!busy}
+                          disabled={
+                            !fresh ||
+                            !!busy ||
+                            approvedModel !== project.revisionId
+                          }
                           onClick={() =>
                             download(
                               p.stl,
@@ -1557,7 +1792,11 @@ export default function Studio({
               </section>
               <section className="panel">
                 <details>
-                  <summary>Serviço de IA: imagens e planejamento</summary>
+                  <summary>
+                    {simple
+                      ? "Conectar IA"
+                      : "Serviço de IA: imagens e planejamento"}
+                  </summary>
                   <p>
                     A análise pode sugerir montagem e alturas. A geometria
                     continua derivada dos contornos revisados. Configure um
@@ -1634,7 +1873,7 @@ export default function Studio({
                         <p key={i}>{s}</p>
                       ))}
                       {plan.status === "proposal" && (
-                        <button className="primary" onClick={applyPlan}>
+                        <button className="primary" onClick={() => applyPlan()}>
                           <Check size={16} />
                           Aplicar proposta e revisar
                         </button>
@@ -1643,7 +1882,7 @@ export default function Studio({
                   )}
                 </details>
               </section>
-              {generated && (
+              {!simple && generated && (
                 <section className="panel">
                   <h2>Levar para a calculadora</h2>
                   <p className="muted">

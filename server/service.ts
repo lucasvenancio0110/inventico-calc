@@ -56,7 +56,8 @@ type Config = {
   imageModel: string;
   visionModel: string;
   origins: string[];
-  reserve: () => void;
+  reserve: () => void | string | Promise<void | string>;
+  release?: (reservation: void | string) => Promise<void>;
   fetch?: typeof fetch;
 };
 const secretEqual = (a: string, b: string) => {
@@ -152,6 +153,8 @@ export function createAIService(config: Config) {
       if (!res.writableEnded) controller.abort();
     });
     let reserved = false;
+    let reservation: void | string = undefined;
+    let acquired = false;
     try {
       const raw = await readJSON(req);
       let path: string;
@@ -230,7 +233,9 @@ export function createAIService(config: Config) {
         return;
       }
       if (controller.signal.aborted) throw Error("Solicitação cancelada.");
-      config.reserve();
+      busy = true;
+      acquired = true;
+      reservation = await config.reserve();
       reserved = true;
       busy = true;
       lastRequest = Date.now();
@@ -249,7 +254,11 @@ export function createAIService(config: Config) {
             result.status +
             "). Confira acesso ao modelo e limites no servidor.",
         );
-      const body = await result.json();
+      const body = (await result.json()) as {
+        data?: { b64_json?: string }[];
+        status?: string;
+        output?: { content?: { type: string; text?: string }[] }[];
+      };
       if (req.url === "/concept") {
         const image = png.parse(
           "data:image/png;base64," + body.data?.[0]?.b64_json,
@@ -266,7 +275,7 @@ export function createAIService(config: Config) {
           throw Error("O provedor não produziu um plano para esta referência.");
         const text = output
           ?.filter((item: { type: string }) => item.type === "output_text")
-          .map((item: { text: string }) => item.text)
+          .map((item: { text?: string }) => item.text ?? "")
           .join("");
         send(200, validatePlan(JSON.parse(text || ""), ids));
       }
@@ -285,7 +294,14 @@ export function createAIService(config: Config) {
       );
     } finally {
       clearTimeout(timeout);
-      if (reserved) busy = false;
+      if (reserved && config.release) {
+        try {
+          await config.release(reservation);
+        } catch {
+          /* A lease expires if release fails. */
+        }
+      }
+      if (acquired) busy = false;
     }
   });
 }

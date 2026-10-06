@@ -99,6 +99,7 @@ export const projectSchema = z
     regions: z.array(regionSchema).max(LIMITS.regions),
     options: optionsSchema,
     reviewed: z.boolean(),
+    modelApprovalRevision: ident.nullable().default(null),
     assumptions: z.array(z.string().max(500)).max(30),
   })
   .superRefine((p, c) => {
@@ -172,6 +173,7 @@ export function newProject(): Project {
       nozzle: 0.4,
     }),
     reviewed: false,
+    modelApprovalRevision: null,
     assumptions: [
       "Largura sugerida: 200 mm. Bico de referência: 0,4 mm, não confirmado.",
     ],

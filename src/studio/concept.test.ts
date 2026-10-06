@@ -3,6 +3,25 @@ import { newProject, parseProject, area } from "./model";
 import { conceptPrompt, defaultBrief } from "./conceptPrompt";
 import { generate } from "./geometry";
 import { writeFileSync } from "node:fs";
+import { endpointURL } from "./ai";
+describe("Cloudflare API endpoint and model confirmation", () => {
+  it("keeps the hosted API prefix without allowing credentials in the URL", () => {
+    expect(endpointURL("https://inventico.example/api/")).toBe(
+      "https://inventico.example/api",
+    );
+    expect(() => endpointURL("https://secret@inventico.example/api")).toThrow();
+  });
+  it("keeps approval tied to its saved revision and defaults old backups to unapproved", () => {
+    const p = newProject();
+    p.modelApprovalRevision = p.revisionId;
+    expect(parseProject(JSON.stringify(p)).modelApprovalRevision).toBe(
+      p.revisionId,
+    );
+    const old = { ...p } as Partial<typeof p>;
+    delete old.modelApprovalRevision;
+    expect(parseProject(JSON.stringify(old)).modelApprovalRevision).toBeNull();
+  });
+});
 describe("Concept persistence and physical NFC pocket", () => {
   it("rejects a concept linked to a different logo", () => {
     const p = newProject();

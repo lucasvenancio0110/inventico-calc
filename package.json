@@ -7,9 +7,11 @@
     "ai:serve": "node --env-file-if-exists=.env server/index.ts",
     "dev": "vite --host localhost --port 5173 --strictPort",
     "build": "tsc -b && vite build",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json && tsc -p tsconfig.cloudflare.json",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy"
   },
   "dependencies": {
     "fflate": "^0.8.3",
@@ -22,6 +24,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261006.1",
     "@eslint/js": "^9.0.0",
     "@tailwindcss/vite": "^4.1.0",
     "@types/node": "^26.6.4",
@@ -36,6 +39,7 @@
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.0.0",
     "vite": "^6.3.0",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wrangler": "^4.147.0"
   }
 }
