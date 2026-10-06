@@ -2,6 +2,7 @@ import { ArrowUpRight, Clock3, Layers3, Sparkles } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { Result } from "../types";
 import { money, num, Stat, tips } from "./ui";
+import { MonthlyPlan } from "./MonthlyPlan";
 const colors = [
   "#ccf582",
   "#87b6ff",
@@ -11,7 +12,7 @@ const colors = [
   "#f49b9b",
   "#8494a6",
 ];
-export function Results({ r }: { r: Result }) {
+export function Results({ r, daysMonth }: { r: Result; daysMonth: number }) {
   const chart = r.lines.filter((l) => l.value > 0);
   return (
     <div className="results">
@@ -70,6 +71,7 @@ export function Results({ r }: { r: Result }) {
           calculável.
         </div>
       )}
+      <MonthlyPlan r={r} daysMonth={daysMonth} />
       <section className="panel">
         <div className="section-row">
           <h3>

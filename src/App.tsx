@@ -348,7 +348,7 @@ export default function App() {
                 </div>
                 <div>
                   {result ? (
-                    <Results r={result} />
+                    <Results r={result} daysMonth={state.settings.daysMonth} />
                   ) : (
                     <div className="panel empty">
                       <Calculator size={36} />
