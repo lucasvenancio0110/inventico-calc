@@ -53,5 +53,5 @@ export function endpointURL(value: string) {
     throw Error("Use HTTPS ou um serviço local em localhost.");
   if (u.username || u.password || u.search || u.hash)
     throw Error("Endpoint inválido.");
-  return u.origin;
+  return u.origin + u.pathname.replace(/\/+$/, "");
 }
